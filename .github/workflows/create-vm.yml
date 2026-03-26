@@ -2,7 +2,7 @@ name: Oracle VM Hunter
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # every 10 minutes
+    - cron: "*/45 * * * *" # every 45 minutes
   workflow_dispatch:
     inputs:
       min_ocpus:
@@ -19,8 +19,46 @@ on:
         default: "8"
 
 jobs:
+  # --- Quick pre-check: skip everything if VM already exists ---
+  pre-check:
+    runs-on: ubuntu-latest
+    outputs:
+      vm_exists: ${{ steps.check.outputs.vm_exists }}
+    steps:
+      - name: Install OCI CLI
+        run: pip install --break-system-packages oci-cli
+
+      - name: Setup OCI credentials
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+          echo "${{ secrets.OCI_KEY }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/config ~/.oci/oci_api_key.pem
+
+      - name: Check if VM already exists
+        id: check
+        env:
+          COMPARTMENT_ID: ${{ secrets.COMPARTMENT_ID }}
+        run: |
+          EXISTING=$(oci compute instance list \
+            --compartment-id "$COMPARTMENT_ID" \
+            --display-name "free-arm-instance" \
+            --lifecycle-state RUNNING \
+            --query "data[0].id" \
+            --raw-output 2>/dev/null || true)
+
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            echo "VM already exists: $EXISTING"
+            echo "vm_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No VM found — hunting."
+            echo "vm_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # --- Load regions from config ---
   load-regions:
+    needs: pre-check
+    if: needs.pre-check.outputs.vm_exists == 'false'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -58,6 +96,7 @@ jobs:
           chmod 600 ~/.oci/config ~/.oci/oci_api_key.pem
 
       - name: Hunt VM in ${{ matrix.region }}
+        id: hunt
         env:
           COMPARTMENT_ID: ${{ secrets.COMPARTMENT_ID }}
           SUBNET_ID: ${{ matrix.subnet_id }}
@@ -68,4 +107,12 @@ jobs:
           MIN_MEMORY: ${{ github.event.inputs.min_memory || '8' }}
         run: |
           chmod +x scripts/create_vm.sh
-          ./scripts/create_vm.sh
+          ./scripts/create_vm.sh && echo "vm_created=true" >> "$GITHUB_OUTPUT" || echo "vm_created=false" >> "$GITHUB_OUTPUT"
+
+      - name: Disable schedule on success
+        if: steps.hunt.outputs.vm_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "VM created — disabling scheduled runs."
+          gh workflow disable "Oracle VM Hunter" --repo "${{ github.repository }}"
