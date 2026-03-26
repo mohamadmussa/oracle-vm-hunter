@@ -1,0 +1,125 @@
+name: Oracle VM Hunter
+
+on:
+  schedule:
+    - cron: "*/45 * * * *" # every 45 minutes
+  workflow_dispatch:
+    inputs:
+      min_ocpus:
+        description: "Start with this many OCPUs (default: 2)"
+        default: "2"
+      max_ocpus:
+        description: "Max OCPUs to try (default: 4)"
+        default: "4"
+      max_memory:
+        description: "Start with this memory in GB (default: 19)"
+        default: "19"
+      min_memory:
+        description: "Minimum acceptable memory in GB (default: 8)"
+        default: "8"
+
+concurrency:
+  group: vm-hunter
+  cancel-in-progress: false
+
+jobs:
+  # --- Quick pre-check: skip everything if VM already exists ---
+  pre-check:
+    runs-on: ubuntu-latest
+    outputs:
+      vm_exists: ${{ steps.check.outputs.vm_exists }}
+    steps:
+      - name: Install OCI CLI
+        run: pip install --break-system-packages oci-cli
+
+      - name: Setup OCI credentials
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+          echo "${{ secrets.OCI_KEY }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/config ~/.oci/oci_api_key.pem
+
+      - name: Check if VM already exists
+        id: check
+        env:
+          COMPARTMENT_ID: ${{ secrets.COMPARTMENT_ID }}
+        run: |
+          EXISTING=$(oci compute instance list \
+            --compartment-id "$COMPARTMENT_ID" \
+            --display-name "free-arm-instance" \
+            --lifecycle-state RUNNING \
+            --query "data[0].id" \
+            --raw-output 2>/dev/null || true)
+
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            echo "VM already exists: $EXISTING"
+            echo "vm_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No VM found — hunting."
+            echo "vm_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --- Load regions from config ---
+  load-regions:
+    needs: pre-check
+    if: needs.pre-check.outputs.vm_exists == 'false'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build region matrix
+        id: set-matrix
+        run: |
+          MATRIX=$(cat config/regions.json | jq -c '{include: .}')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Regions: $MATRIX"
+
+  # --- Hunt VM in each region (parallel) ---
+  hunt-vm:
+    needs: load-regions
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    strategy:
+      matrix: ${{ fromJson(needs.load-regions.outputs.matrix) }}
+      fail-fast: false  # keep hunting other regions if one fails
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OCI CLI
+        run: pip install --break-system-packages oci-cli
+
+      - name: Setup OCI credentials
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+          echo "${{ secrets.OCI_KEY }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/config ~/.oci/oci_api_key.pem
+
+      - name: Hunt VM in ${{ matrix.region }}
+        id: hunt
+        env:
+          COMPARTMENT_ID: ${{ secrets.COMPARTMENT_ID }}
+          SUBNET_ID: ${{ matrix.subnet_id }}
+          REGION: ${{ matrix.region }}
+          MIN_OCPUS: ${{ github.event.inputs.min_ocpus || '2' }}
+          MAX_OCPUS: ${{ github.event.inputs.max_ocpus || '4' }}
+          MAX_MEMORY: ${{ github.event.inputs.max_memory || '19' }}
+          MIN_MEMORY: ${{ github.event.inputs.min_memory || '8' }}
+        run: |
+          chmod +x scripts/create_vm.sh
+          ./scripts/create_vm.sh && echo "vm_created=true" >> "$GITHUB_OUTPUT" || echo "vm_created=false" >> "$GITHUB_OUTPUT"
+
+      - name: Disable schedule on success
+        if: steps.hunt.outputs.vm_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "VM created — disabling scheduled runs."
+          gh workflow disable "Oracle VM Hunter" --repo "${{ github.repository }}"
