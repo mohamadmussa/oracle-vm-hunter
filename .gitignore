@@ -1,0 +1,13 @@
+# Secrets — NEVER commit
+.env
+.env.backup
+*.pem
+
+# OCI config
+.oci/
+
+# logs
+*.log
+
+# devcontianer
+.devcontainer/
