@@ -85,7 +85,7 @@ The script implements a **CPU/Memory sweep strategy**:
    - CPU: 2 OCPU → 3 OCPU → 4 OCPU (smaller = more likely available)
    - Memory: MAX_MEMORY → MIN_MEMORY in 1 GB steps per CPU level
    - ADs: try all 3 Availability Domains per combination
-5. Stop immediately on first successful launch (`break 3`)
+5. Stop immediately on first successful launch (shared sentinel file signals all workers to stop)
 
 This creates up to **108 attempts per run** (3 CPU levels × 12 memory steps × 3 ADs).
 
@@ -170,7 +170,7 @@ ENABLE_BACKUP=false     # Backup module (default: false)
 
 ---
 
-## 8. Modules
+## 9. Modules
 
 Each module lives in `modules/<name>/docker-compose.yml`. Currently available:
 
@@ -180,7 +180,7 @@ To add a new module, create `modules/<name>/docker-compose.yml` and add the togg
 
 ---
 
-## 9. Local Testing with `act`
+## 10. Local Testing with `act`
 
 Before pushing to GitHub, test the workflow locally using [act](https://github.com/nektos/act).
 
@@ -215,7 +215,7 @@ act workflow_dispatch -j hunt-vm --secret-file .env \
 
 ---
 
-## 10. GitHub Secrets (for production)
+## 11. GitHub Secrets (for production)
 
 Once local tests pass, configure secrets in GitHub:
 
@@ -230,7 +230,7 @@ Go to: **Settings > Secrets and variables > Actions**
 
 ---
 
-## 11. Next Steps
+## 12. Next Steps
 
 - [x] Fill in `.env` with real OCI credentials
 - [x] Test workflow locally with `act`
