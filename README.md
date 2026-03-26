@@ -2,7 +2,7 @@
 
 Automated Oracle Cloud ARM VM resource hunting via GitHub Actions.
 
-Continuously attempts to provision a free-tier **VM.Standard.A1.Flex** (ARM) instance on Oracle Cloud Infrastructure. Runs every 10 minutes via GitHub Actions cron, sweeping through CPU/memory combinations and availability domains until capacity is found.
+Continuously attempts to provision a free-tier **VM.Standard.A1.Flex** (ARM) instance on Oracle Cloud Infrastructure. Runs every 45 minutes via GitHub Actions cron, sweeping through CPU/memory combinations and availability domains until capacity is found.
 
 ## How It Works
 
