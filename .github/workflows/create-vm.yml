@@ -1,0 +1,71 @@
+name: Oracle VM Hunter
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes
+  workflow_dispatch:
+    inputs:
+      min_ocpus:
+        description: "Start with this many OCPUs (default: 2)"
+        default: "2"
+      max_ocpus:
+        description: "Max OCPUs to try (default: 4)"
+        default: "4"
+      max_memory:
+        description: "Start with this memory in GB (default: 19)"
+        default: "19"
+      min_memory:
+        description: "Minimum acceptable memory in GB (default: 8)"
+        default: "8"
+
+jobs:
+  # --- Load regions from config ---
+  load-regions:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build region matrix
+        id: set-matrix
+        run: |
+          MATRIX=$(cat config/regions.json | jq -c '{include: .}')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Regions: $MATRIX"
+
+  # --- Hunt VM in each region (parallel) ---
+  hunt-vm:
+    needs: load-regions
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.load-regions.outputs.matrix) }}
+      fail-fast: false  # keep hunting other regions if one fails
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OCI CLI
+        run: pip install --break-system-packages oci-cli
+
+      - name: Setup OCI credentials
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+          echo "${{ secrets.OCI_KEY }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/config ~/.oci/oci_api_key.pem
+
+      - name: Hunt VM in ${{ matrix.region }}
+        env:
+          COMPARTMENT_ID: ${{ secrets.COMPARTMENT_ID }}
+          SUBNET_ID: ${{ matrix.subnet_id }}
+          REGION: ${{ matrix.region }}
+          MIN_OCPUS: ${{ github.event.inputs.min_ocpus || '2' }}
+          MAX_OCPUS: ${{ github.event.inputs.max_ocpus || '4' }}
+          MAX_MEMORY: ${{ github.event.inputs.max_memory || '19' }}
+          MIN_MEMORY: ${{ github.event.inputs.min_memory || '8' }}
+        run: |
+          chmod +x scripts/create_vm.sh
+          ./scripts/create_vm.sh
