@@ -18,6 +18,10 @@ on:
         description: "Minimum acceptable memory in GB (default: 8)"
         default: "8"
 
+concurrency:
+  group: vm-hunter
+  cancel-in-progress: false
+
 jobs:
   # --- Quick pre-check: skip everything if VM already exists ---
   pre-check:
@@ -77,6 +81,9 @@ jobs:
   hunt-vm:
     needs: load-regions
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     strategy:
       matrix: ${{ fromJson(needs.load-regions.outputs.matrix) }}
       fail-fast: false  # keep hunting other regions if one fails

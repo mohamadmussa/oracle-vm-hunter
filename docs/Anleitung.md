@@ -138,22 +138,25 @@ The workflow reads `config/regions.json` and runs **all regions in parallel** us
 
 ## 7. GitHub Actions Workflow (`.github/workflows/create-vm.yml`)
 
-Runs every 10 minutes via cron. Hunts across **all configured regions in parallel**.
+Runs every 45 minutes via cron. Hunts across **all configured regions in parallel**.
 
 ```yaml
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/45 * * * *"
   workflow_dispatch:        # manual trigger with inputs
 ```
 
-The workflow has two jobs:
-1. **load-regions** — reads `config/regions.json` and builds the matrix
-2. **hunt-vm** — runs `create_vm.sh` for each region (parallel, `fail-fast: false`)
+The workflow has three jobs:
+1. **pre-check** — fast check if VM already exists (skips everything if yes)
+2. **load-regions** — reads `config/regions.json` and builds the matrix
+3. **hunt-vm** — runs `create_vm.sh` for each region (parallel, `fail-fast: false`)
+
+On successful VM creation, the workflow **auto-disables its cron schedule** via `gh workflow disable`. To re-enable: **Actions > Oracle VM Hunter > Enable workflow**.
 
 ---
 
-## 7. Bootstrap Script (`scripts/bootstrap.sh`)
+## 8. Bootstrap Script (`scripts/bootstrap.sh`)
 
 Runs on the VM after creation to install Docker and deploy services.
 

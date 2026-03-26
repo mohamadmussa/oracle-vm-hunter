@@ -6,22 +6,20 @@ Continuously attempts to provision a free-tier **VM.Standard.A1.Flex** (ARM) ins
 
 ## How It Works
 
-1. **Cron trigger** — GitHub Actions runs every 10 minutes (or manual dispatch)
-2. **Pre-flight check** — skips if a VM with the same name already exists
+1. **Cron trigger** — GitHub Actions runs every 45 minutes (or manual dispatch)
+2. **Pre-check job** — skips entire workflow if VM already exists (fast, no heavy setup)
 3. **Image resolution** — finds the latest Ubuntu 22.04 ARM image
 4. **AD auto-discovery** — queries all availability domains in the region
-5. **Shape sweep** — tries CPU/memory combinations in this order:
-   - 2 OCPU (19 GB -> 8 GB in 1 GB steps)
-   - 3 OCPU (19 GB -> 8 GB)
-   - 4 OCPU (19 GB -> 8 GB)
-   - Each combination is tried across all 3 availability domains
-6. **First success wins** — stops immediately when a VM is created
+5. **Parallel shape sweep** — launches one worker per CPU level simultaneously:
+   - 2 OCPU, 3 OCPU, 4 OCPU — each sweeping memory from 19 GB down to 8 GB
+   - Every combination is tried across all 3 availability domains
+6. **First success wins** — stops all workers and disables the cron schedule
 
 This produces up to **108 attempts per run**, maximizing the chance of finding capacity.
 
 ## Project Structure
 
-```
+```text
 oracle-vm-hunter/
 ├── .github/workflows/
 │   └── create-vm.yml           # GitHub Actions cron workflow
@@ -69,7 +67,7 @@ oracle-vm-hunter/
    ]
    ```
 
-4. The workflow runs automatically every 10 minutes. You can also trigger it manually via **Actions > Oracle VM Hunter > Run workflow**.
+4. The workflow runs automatically every 45 minutes. You can also trigger it manually via **Actions > Oracle VM Hunter > Run workflow**. On success, the schedule auto-disables. Re-enable via **Actions > Oracle VM Hunter > Enable workflow**.
 
 ### Local Testing with `act`
 

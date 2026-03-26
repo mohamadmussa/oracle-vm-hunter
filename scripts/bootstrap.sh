@@ -6,7 +6,20 @@ set -euo pipefail
 # Installs Docker and deploys enabled modules
 # ----------------------------------------
 
-MODULES_DIR="${MODULES_DIR:-./modules}"
+REPO_URL="https://raw.githubusercontent.com/mohamadmussa/oracle-vm-hunter/main"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Use local modules if available, otherwise fetch from GitHub
+if [ -d "$REPO_ROOT/modules" ]; then
+  MODULES_DIR="$REPO_ROOT/modules"
+else
+  MODULES_DIR=$(mktemp -d)
+  trap 'rm -rf "$MODULES_DIR"' EXIT
+  echo "Fetching modules from GitHub..."
+  mkdir -p "$MODULES_DIR/kavita"
+  curl -sL "$REPO_URL/modules/kavita/docker-compose.yml" -o "$MODULES_DIR/kavita/docker-compose.yml"
+fi
 
 # Module toggles (controlled via env vars)
 ENABLE_KAVITA="${ENABLE_KAVITA:-true}"
@@ -38,7 +51,7 @@ deploy_module() {
   fi
 
   echo "Deploying module: $name"
-  docker compose -f "$dir/docker-compose.yml" up -d
+  sudo docker compose -f "$dir/docker-compose.yml" up -d
   echo "Module '$name' is running."
 }
 
