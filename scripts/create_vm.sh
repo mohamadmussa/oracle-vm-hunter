@@ -39,6 +39,7 @@ EXISTING=$(oci compute instance list \
 
 if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
   echo "VM already exists: $EXISTING — skipping creation."
+  echo "vm_status=exists" >> "${GITHUB_OUTPUT:-/dev/null}"
   exit 0
 fi
 
@@ -149,6 +150,7 @@ if [ -f "$SUCCESS_FILE" ]; then
   read -r FINAL_OCPUS FINAL_MEMORY INSTANCE_ID < "$SUCCESS_FILE"
   echo ""
   echo "VM created: $INSTANCE_ID (${FINAL_OCPUS} OCPU / ${FINAL_MEMORY} GB)"
+  echo "vm_status=created" >> "${GITHUB_OUTPUT:-/dev/null}"
   echo "Done."
   exit 0
 fi
