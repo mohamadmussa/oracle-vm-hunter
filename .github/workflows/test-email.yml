@@ -1,0 +1,25 @@
+name: Test Email Notification
+
+on:
+  workflow_dispatch:
+
+jobs:
+  send-test-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send test email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "VM Hunter: Test Email"
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: Oracle VM Hunter <${{ secrets.GMAIL_ADDRESS }}>
+          body: |
+            This is a test email from Oracle VM Hunter.
+
+            If you receive this, the email notification is working correctly.
+
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
