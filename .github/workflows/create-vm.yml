@@ -116,6 +116,24 @@ jobs:
           chmod +x scripts/create_vm.sh
           ./scripts/create_vm.sh && echo "vm_created=true" >> "$GITHUB_OUTPUT" || echo "vm_created=false" >> "$GITHUB_OUTPUT"
 
+      - name: Send success email
+        if: steps.hunt.outputs.vm_created == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "VM Hunter: Instance created in ${{ matrix.region }}"
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: Oracle VM Hunter <${{ secrets.GMAIL_ADDRESS }}>
+          body: |
+            A free-tier ARM instance was successfully created.
+
+            Region: ${{ matrix.region }}
+            Shape: VM.Standard.A1.Flex
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: Disable schedule on success
         if: steps.hunt.outputs.vm_created == 'true'
         env:

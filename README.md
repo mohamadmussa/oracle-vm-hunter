@@ -13,7 +13,7 @@ Continuously attempts to provision a free-tier **VM.Standard.A1.Flex** (ARM) ins
 5. **Parallel shape sweep** — launches one worker per CPU level simultaneously:
    - 2 OCPU, 3 OCPU, 4 OCPU — each sweeping memory from 19 GB down to 8 GB
    - Every combination is tried across all 3 availability domains
-6. **First success wins** — stops all workers and disables the cron schedule
+6. **First success wins** — sends email notification, stops all workers, and disables the cron schedule
 
 This produces up to **108 attempts per run**, maximizing the chance of finding capacity.
 
@@ -55,6 +55,8 @@ oracle-vm-hunter/
    | `OCI_CONFIG`     | Contents of `~/.oci/config`         |
    | `OCI_KEY`        | OCI API private key (`.pem` content)|
    | `COMPARTMENT_ID` | Compartment or tenancy OCID         |
+   | `GMAIL_ADDRESS`  | Gmail address for notifications     |
+   | `GMAIL_APP_PASSWORD` | Gmail App Password ([setup guide](https://support.google.com/accounts/answer/185833)) |
 
 3. Edit `config/regions.json` with your region and subnet OCID:
 
@@ -67,7 +69,7 @@ oracle-vm-hunter/
    ]
    ```
 
-4. The workflow runs automatically every 45 minutes. You can also trigger it manually via **Actions > Oracle VM Hunter > Run workflow**. On success, the schedule auto-disables. Re-enable via **Actions > Oracle VM Hunter > Enable workflow**.
+4. The workflow runs automatically every 45 minutes. You can also trigger it manually via **Actions > Oracle VM Hunter > Run workflow**. On success, you receive an email and the schedule auto-disables. Re-enable via **Actions > Oracle VM Hunter > Enable workflow**.
 
 ### Local Testing with `act`
 

@@ -152,7 +152,7 @@ The workflow has three jobs:
 2. **load-regions** — reads `config/regions.json` and builds the matrix
 3. **hunt-vm** — runs `create_vm.sh` for each region (parallel, `fail-fast: false`)
 
-On successful VM creation, the workflow **auto-disables its cron schedule** via `gh workflow disable`. To re-enable: **Actions > Oracle VM Hunter > Enable workflow**.
+On successful VM creation, the workflow **sends an email notification** via Gmail SMTP and then **auto-disables its cron schedule** via `gh workflow disable`. To re-enable: **Actions > Oracle VM Hunter > Enable workflow**.
 
 ---
 
@@ -226,6 +226,8 @@ Go to: **Settings > Secrets and variables > Actions**
 | `OCI_CONFIG`           | Contents of `~/.oci/config`                         |
 | `OCI_KEY`              | Contents of the OCI API private key (`.pem`)        |
 | `COMPARTMENT_ID`       | OCI compartment OCID                                |
+| `GMAIL_ADDRESS`        | Gmail address for success notifications              |
+| `GMAIL_APP_PASSWORD`   | Gmail App Password (Google > Security > App Passwords) |
 | `SUBNET_ID`            | VCN subnet OCID (only needed for single-region testing) |
 
 ---
@@ -237,6 +239,6 @@ Go to: **Settings > Secrets and variables > Actions**
 - [ ] Configure GitHub Secrets for production
 - [ ] Optimize sweep speed (parallel ADs, larger memory steps)
 - [ ] Add Cloudflare tunnel integration
-- [ ] Add notification on success (Telegram/Discord)
+- [x] Add email notification on success (Gmail SMTP)
 - [ ] Add persistent storage (Rclone to R2/B2)
 - [ ] Add backup module
